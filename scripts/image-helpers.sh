@@ -86,6 +86,7 @@ unmount_on_exit()
 	umount -l "${MOUNT}" >/dev/null 2>&1
 	[[ $CRYPTROOT_ENABLE == yes ]] && cryptsetup luksClose "${ROOT_MAPPER}"
 	losetup -d "${LOOP}" >/dev/null 2>&1
+	[[ -n $LOOP ]] && rm -f "${LOOP}"p* # partition nodes created by check_loop_device
 	rm -rf --one-file-system "${SDCARD}"
 	exit_with_error "debootstrap-ng was interrupted" || true # don't trigger again
 
@@ -100,6 +101,15 @@ check_loop_device()
 {
 
 	local device=$1
+	if [[ ! -b $device && $device == /dev/loop* ]]; then
+		# udev may be slow (or absent, e.g. on WSL) to create loop partition nodes
+		udevadm settle >/dev/null 2>&1
+		local sysdev="/sys/class/block/${device##*/}/dev"
+		if [[ ! -b $device && -f $sysdev ]]; then
+			display_alert "Creating device node" "$device"
+			mknod -m0660 "${device}" b "$(cut -d: -f1 "$sysdev")" "$(cut -d: -f2 "$sysdev")"
+		fi
+	fi
 	if [[ ! -b $device ]]; then
 		if [[ $CONTAINER_COMPAT == yes && -b /tmp/$device ]]; then
 			display_alert "Creating device node" "$device"

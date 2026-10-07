@@ -655,6 +655,7 @@ PREPARE_IMAGE_SIZE
 	check_loop_device "$LOOP"
 
 	losetup -P $LOOP ${SDCARD}.raw
+	partprobe $LOOP >/dev/null 2>&1
 
 	# loop device was grabbed here, unlock
 	flock -u $FD
@@ -919,6 +920,7 @@ POST_UMOUNT_FINAL_IMAGE
 	done
 
 	losetup -d $LOOP
+	[[ -n $LOOP ]] && rm -f "${LOOP}"p* # partition nodes created by check_loop_device
 	rm -rf --one-file-system $DESTIMG $MOUNT
 
 	mkdir -p $DESTIMG

@@ -317,19 +317,19 @@ improved_git()
 {
 
 	local realgit=$(command -v git)
-	local retries=3
+	local retries=5
 	local delay=10
 	local count=1
-	while [ $count -lt $retries ]; do
+	while [ $count -le $retries ]; do
 		$realgit "$@"
 		if [[ $? -eq 0 || -f .git/index.lock ]]; then
-			retries=0
-			break
+			return 0
 		fi
 	let count=$count+1
 	sleep $delay
 	done
 
+	return 1
 }
 
 clean_up_git ()
@@ -618,14 +618,14 @@ fetch_from_repo()
 			else
 
 				display_alert "Checking out"
-				git checkout -f -q FETCH_HEAD
+				git checkout -f -q FETCH_HEAD || exit_with_error "Checkout failed, fetching sources may have failed" "${url} ${ref_name}"
 				git clean -qdf
 
 			fi
 		else
 
 			display_alert "Checking out"
-			git checkout -f -q FETCH_HEAD
+			git checkout -f -q FETCH_HEAD || exit_with_error "Checkout failed, fetching sources may have failed" "${url} ${ref_name}"
 			git clean -qdf
 
 		fi
@@ -1431,7 +1431,7 @@ prepare_host()
 	local hostdeps="acl aptly aria2 bc binfmt-support bison btrfs-progs       \
 	build-essential  ca-certificates ccache cpio cryptsetup curl              \
 	debian-archive-keyring debian-keyring debootstrap device-tree-compiler    \
-	dialog dirmngr dosfstools dwarves f2fs-tools fakeroot flex gawk           \
+	dialog dirmngr dosfstools dwarves f2fs-tools fakeroot fdisk flex gawk     \
 	gcc-arm-linux-gnueabihf gdisk gpg imagemagick jq kmod libbison-dev \
 	libc6-dev-armhf-cross libelf-dev libfdt-dev libfile-fcntllock-perl        \
 	libfl-dev liblz4-tool libncurses-dev libpython2.7-dev libssl-dev          \
@@ -1487,6 +1487,9 @@ prepare_host()
 	if grep -qE "(Microsoft|WSL)" /proc/version; then
 		if [ -f /.dockerenv ]; then
 			display_alert "Building images using Docker on WSL2 may fail" "" "wrn"
+		elif [[ $ALLOW_WSL == yes ]]; then
+			# ALLOW_WSL overrides the WSL check. Requires WSL2 with loop devices and qemu binfmt available
+			display_alert "Running on Windows subsystem for Linux, which is unsupported" "" "wrn"
 		else
 			exit_with_error "Windows subsystem for Linux is not a supported build environment"
 		fi
